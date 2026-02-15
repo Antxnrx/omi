@@ -4,7 +4,7 @@
 Parents manually log sleep and cries in apps, especially hard overnight.
 
 ## 0:20-0:45 Solution
-Baby Sleep Sync listens to Omi transcript webhooks and auto-detects baby events.
+Baby Sleep Sync listens to transcript webhooks from the Omi AI circular pendant and auto-detects baby events.
 
 ## 0:45-1:30 Live walkthrough
 1. Populate demo data.
