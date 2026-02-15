@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baby Sleep Sync Dashboard • Omi Pendant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto space-y-6">
+    <header class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900">Baby Sleep Sync • Omi Circular Pendant</h1>
+        <p class="text-slate-600">Built for the Omi AI circular pendant: automatic sleep + cry tracking with simulated Huckleberry sync</p>
+      </div>
+      <div class="space-x-2">
+        <button onclick="populateDemo()" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Populate Demo Data</button>
+        <button onclick="syncHuckleberry()" class="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">Sync to Huckleberry</button>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-4" id="cards"></section>
+
+    <section class="grid md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-xl font-semibold mb-3">Auto Insights</h2>
+        <p class="text-xs text-slate-500 mb-2">Source device: <strong>Omi AI Circular Pendant</strong></p>
+        <div id="insights" class="space-y-2 text-sm"></div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-xl font-semibold mb-3">Sleep Pattern Snapshot</h2>
+        <p class="text-sm text-slate-600 mb-2">Timeline of recent sleep/wake events:</p>
+        <div id="sleep-patterns" class="space-y-2 text-sm"></div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-xl font-semibold mb-3">Recent Pendant Event Stream</h2>
+      <div id="event-list" class="space-y-2 text-sm"></div>
+    </section>
+
+    <div id="sync-status" class="text-sm font-medium"></div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:8000';
+
+    function card(label, value, color='text-slate-900') {
+      return `<div class="bg-white rounded-xl shadow p-4"><div class="text-xs uppercase tracking-wide text-slate-500">${label}</div><div class="text-3xl font-bold ${color}">${value}</div></div>`;
+    }
+
+    function eventIcon(type) {
+      if (type === 'cry_detected') return '😭';
+      if (type === 'sleep_detected') return '😴';
+      if (type === 'wake_detected') return '👶';
+      if (type === 'feed_detected') return '🍼';
+      return '•';
+    }
+
+    async function fetchJson(path, options={}) {
+      const response = await fetch(`${API_URL}${path}`, options);
+      return response.json();
+    }
+
+    async function loadDashboard() {
+      const [summary, insights] = await Promise.all([
+        fetchJson('/summary'),
+        fetchJson('/insights')
+      ]);
+
+      document.getElementById('cards').innerHTML = [
+        card('Total Events', summary.total_events),
+        card('Cry Detections', summary.cries, 'text-rose-600'),
+        card('Sleep Events', summary.sleep_events, 'text-indigo-600'),
+        card('Wake Events', summary.wake_events, 'text-amber-600'),
+        card('Feeds', summary.feeds, 'text-emerald-600'),
+      ].join('');
+
+      const insightsNode = document.getElementById('insights');
+      insightsNode.innerHTML = insights.insights.length
+        ? insights.insights.map(i => `<div class="p-2 rounded border">${i.icon} ${i.message}</div>`).join('')
+        : '<div class="text-slate-500">No insights yet. Add events first.</div>';
+
+      const recent = [...summary.events].reverse();
+      document.getElementById('event-list').innerHTML = recent.length
+        ? recent.map(e => `
+            <div class="border rounded p-2">
+              <div class="flex justify-between">
+                <div>${eventIcon(e.type)} <strong>${e.type.replaceAll('_',' ')}</strong> ${e.classification ? `<span class="text-slate-500">(${e.classification})</span>` : ''}</div>
+                <div class="text-slate-500">${new Date(e.timestamp).toLocaleTimeString()}</div>
+              </div>
+              <div class="text-slate-600">${e.text || ''}</div>
+            </div>
+          `).join('')
+        : '<div class="text-slate-500">No events detected.</div>';
+
+      const sleepEvents = recent.filter(e => e.type === 'sleep_detected' || e.type === 'wake_detected');
+      document.getElementById('sleep-patterns').innerHTML = sleepEvents.length
+        ? sleepEvents.slice(0, 8).map(e => `<div class="border-l-4 ${e.type === 'sleep_detected' ? 'border-indigo-500' : 'border-amber-500'} pl-3">${eventIcon(e.type)} ${e.type.replace('_detected','')} @ ${new Date(e.timestamp).toLocaleTimeString()}</div>`).join('')
+        : '<div class="text-slate-500">No sleep/wake events yet.</div>';
+    }
+
+    async function populateDemo() {
+      await fetchJson('/demo/populate', { method: 'POST' });
+      await loadDashboard();
+    }
+
+    async function syncHuckleberry() {
+      const result = await fetchJson('/sync/huckleberry', { method: 'POST' });
+      document.getElementById('sync-status').innerHTML = `✅ Synced ${result.exported_count} events to ${result.destination} (simulated)`;
+    }
+
+    loadDashboard();
+    setInterval(loadDashboard, 5000);
+  </script>
+</body>
+</html>
